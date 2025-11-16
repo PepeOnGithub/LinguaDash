@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinguaDash Vokabel-Trainer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        
+        :root {
+            --accent-color: #489c49;
+            --bg-dark: #1f2937; /* Gray 800 */
+            --bg-light: #111827; /* Gray 900 */
+            --text-primary: #f9fafb; /* Gray 50 */
+            --text-secondary: #9ca3af; /* Gray 400 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+        }
+        
+        /* 3D-Container für die Karte: Streckt sich jetzt auf 100% des Wrappers */
+        .card-container {
+            perspective: 1000px;
+            width: 100%; /* Wichtig: Füllt den Slide-Container */
+            height: 300px;
+        }
+
+        .card-inner {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .card-inner.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .card-front {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .card-back {
+            background-color: var(--bg-light);
+            color: var(--text-primary);
+            border: 4px solid var(--accent-color);
+            transform: rotateY(180deg);
+        }
+
+        /* Quiz Button Kahoot Colors */
+        .quiz-option-1 { background-color: #ef4444; } /* Red 500 */
+        .quiz-option-2 { background-color: #3b82f6; } /* Blue 500 */
+        .quiz-option-3 { background-color: #f59e0b; } /* Yellow 500 */
+        .quiz-option-4 { background-color: #8b5cf6; } /* Purple 500 */
+
+        .quiz-option-correct { background-color: #10b981; } /* Emerald 500 */
+        .quiz-option-incorrect { background-color: #dc2626; } /* Red 600 */
+        .quiz-option-disabled { background-color: #4b5563; opacity: 0.7; } /* Gray 600 */
+
+        /* Utility for Lucide Icons */
+        .icon { width: 1.25rem; height: 1.25rem; display: inline-block; vertical-align: middle; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header/App Bar -->
+    <header class="bg-[#1f2937] shadow-lg p-4 flex justify-center sticky top-0 z-20">
+        <div class="w-full max-w-5xl flex justify-between items-center">
+            <h1 class="text-3xl font-black tracking-tight" style="color: var(--accent-color);">
+                Lingua<span class="text-gray-50">Dash</span>
+            </h1>
+            <div id="chapter-display" class="hidden sm:block text-sm text-gray-400 font-medium">
+                Aktuelles Kapitel: 1
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Tabs -->
+    <nav class="bg-[#1f2937] shadow-inner p-2 sticky top-[68px] z-10">
+        <div class="flex w-full max-w-5xl mx-auto space-x-2">
+            <button onclick="changeTab('Lernen')" id="tab-Lernen" class="flex-1 p-2 sm:px-4 sm:py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform-gpu flex items-center justify-center bg-[#489c49] text-white shadow-lg scale-[1.03]">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon mr-1 sm:mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><polyline points="15 8 18 11 15 14"/></svg>
+                Lernen
+            </button>
+            <button onclick="changeTab('Quiz')" id="tab-Quiz" class="flex-1 p-2 sm:px-4 sm:py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform-gpu flex items-center justify-center text-[#489c49] bg-gray-800 hover:bg-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon mr-1 sm:mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17.5V21M3 3v21h18V3L12 13 3 3z"/><line x1="12" x2="12" y1="21" y2="17.5"/></svg>
+                Quiz
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow w-full max-w-5xl mx-auto p-4 pb-16">
+        <div id="content-container" class="mt-4 bg-[#111827] rounded-3xl shadow-2xl min-h-[70vh] p-4 sm:p-8">
+            <!-- Content will be injected here -->
+        </div>
+    </main>
+
+    <script>
+        const initialVocabulary = [
+            // --- Kapitel 1 (30 Vokabeln) ---
+            { id: 101, latin: 'respondēre, eo, spondī, spōnsum', german: 'antworten', chapter: 1 },
+            { id: 102, latin: 'tū, Gen. tuī, Dat. tibi, Akk. tē, Abl. tē', german: 'du', chapter: 1 },
+            { id: 103, latin: 'posse, possum, potuī', german: 'können', chapter: 1 },
+            { id: 104, latin: 'num Adv.', german: 'etwa?', chapter: 1 },
+            { id: 105, latin: 'māter, mātris f.', german: 'die Mutter', chapter: 1 },
+            { id: 106, latin: 'omnis, is, e', german: 'jeder, ganz, Pl. alle', chapter: 1 },
+            { id: 107, latin: 'crēdere, o, didī, dītum', german: 'glauben, anvertrauen', chapter: 1 },
+            { id: 108, latin: 'superbus, a, um', german: 'der Stolz, die Überheblichkeit', chapter: 1 },
+            { id: 109, latin: 'pater, patris m.', german: 'der Vater', chapter: 1 },
+            { id: 110, latin: 'falsus, a, um', german: 'falsch', chapter: 1 },
+            { id: 111, latin: 'haud Adv.', german: 'nicht', chapter: 1 },
+            { id: 112, latin: 'īra, ae f.', german: 'der Zorn, die Wut', chapter: 1 },
+            { id: 113, latin: 'īrā incēnsus, a, um', german: 'der flammende Zorn', chapter: 1 },
+            { id: 114, latin: 'domus, domūs f.', german: 'das Haus', chapter: 1 },
+            { id: 115, latin: 'petere, o, īvī, ītum', german: 'bitten, verlangen, sich sehnen (nach), angreifen', chapter: 1 },
+            { id: 116, latin: 'statim Adv.', german: 'sofort', chapter: 1 },
+            { id: 117, latin: 'nārrāre, o, āvī, ātum', german: 'erzählen', chapter: 1 },
+            { id: 118, latin: 'dē Präp. m. Abl.', german: 'über, von, von ... her, von ... weg, von ... herab', chapter: 1 },
+            { id: 119, latin: 'hīc, haec, hoc', german: 'hier', chapter: 1 },
+            { id: 120, latin: 'rēs, reī f.', german: 'die Sache, das Ding, die Angelegenheit', chapter: 1 },
+            { id: 121, latin: 'dolēre, eo, doluī, -', german: 'traurig sein (über), leiden (an)', chapter: 1 },
+            { id: 122, latin: 'ait', german: 'behauptet(e) er, sagt(e) er', chapter: 1 },
+            { id: 123, latin: 'quīdem Konj.', german: 'freilich, gewiss, wenigstens, zwar', chapter: 1 },
+            { id: 124, latin: 'audīre, io, īvī, ītum', german: 'hören', chapter: 1 },
+            { id: 125, latin: 'sed Konj.', german: 'aber, sondern', chapter: 1 },
+            { id: 126, latin: 'ego, Gen. meī, Dat. mihi, Akk./Abl. mē', german: 'ich', chapter: 1 },
+            { id: 127, latin: 'tacēre, eo, tacuī, tacitum', german: 'schweigen, verschweigen', chapter: 1 },
+            { id: 128, latin: 'quī, quae, quod', german: 'welcher, welche, welches, der, die, das', chapter: 1 },
+            { id: 129, latin: 'semper Adv.', german: 'immer', chapter: 1 },
+            { id: 130, latin: 'pudet, puduit', german: 'beschämen, es schämt sich jmd.', chapter: 1 },
+
+            // --- Kapitel 2 (27 Vokabeln) ---
+            { id: 201, latin: 'cūr Adv.', german: 'warum', chapter: 2 },
+            { id: 202, latin: 'venīre, io, vēnī, ventum', german: 'kommen', chapter: 2 },
+            { id: 203, latin: 'arx, arcis f.', german: 'Burg, Festung, Anhöhe', chapter: 2 },
+            { id: 204, latin: 'meus, a, um', german: 'mein', chapter: 2 },
+            { id: 205, latin: 'lūx, lūcis f.', german: 'Licht (Helligkeit), Tageslicht', chapter: 2 },
+            { id: 206, latin: 'mundus, ī m.', german: 'Schmuck, Welt, Weltall', chapter: 2 },
+            { id: 207, latin: 'profēctō Adv.', german: 'sicherlich, tatsächlich', chapter: 2 },
+            { id: 208, latin: 'dare, o, dedī, datum', german: 'geben', chapter: 2 },
+            { id: 209, latin: 'mālle, mālō, māluī', german: 'lieber wollen', chapter: 2 },
+            { id: 210, latin: 'per Präp. m. Akk.', german: 'durch', chapter: 2 },
+            { id: 211, latin: 'tuus, a, um', german: 'dein', chapter: 2 },
+            { id: 212, latin: 'animus, ī m.', german: 'der Geist, der Mut, die Gesinnung', chapter: 2 },
+            { id: 213, latin: 'dīcere, o, dīxī, dictum', german: 'sagen, sprechen', chapter: 2 },
+            { id: 214, latin: 'aliquī, aliquae, aliquod', german: 'einer, eine, eines, irgendein', chapter: 2 },
+            { id: 215, latin: 'ut Konj.', german: 'wie, sobald, sooft, dass, sodass, damit', chapter: 2 },
+            { id: 216, latin: 'dubitāre, o, āvī, ātum', german: 'zögern, zweifeln', chapter: 2 },
+            { id: 217, latin: 'ille, illa, illud', german: 'jener, jene, jenes, der (dort), Gen. illīus, Dat. illī', chapter: 2 },
+            { id: 218, latin: 'ferre, ferō, tulī, lātum', german: 'bringen, tragen, ertragen', chapter: 2 },
+            { id: 219, latin: 'scīre, io, īvī, ītum', german: 'wissen, kennen, verstehen', chapter: 2 },
+            { id: 220, latin: 'is, ea, id', german: 'dieser, diese, dieses, er, sie, es', chapter: 2 },
+            { id: 221, latin: 'vix Adv.', german: 'kaum, (nur) mit Mühe', chapter: 2 },
+            { id: 222, latin: 'dēsinere, o, sīvī, situm', german: 'aufhören', chapter: 2 },
+            { id: 223, latin: 'rogāre, o, āvī, ātum', german: 'fragen, bitten', chapter: 2 },
+            { id: 224, latin: 'currus, ūs m.', german: 'der Wagen', chapter: 2 },
+            { id: 225, latin: 'vehī, or, vectus sum', german: 'gefahren werden (gefahren werden)', chapter: 2 },
+            { id: 226, latin: 'cupere, io, īvī, ītum', german: 'wollen, wünschen, verlangen', chapter: 2 },
+            { id: 227, latin: 'habēre, eo, uī, itum', german: 'haben, halten', chapter: 2 },
+
+            // --- Kapitel 3 (27 Vokabeln) ---
+            { id: 301, latin: 'paenitet, paenituīt', german: 'jemand bereut etwas', chapter: 3 },
+            { id: 302, latin: 'verbum, ī n.', german: 'Wort, Äußerung', chapter: 3 },
+            { id: 303, latin: 'utinam Adv.', german: 'hoffentlich, wenn doch nur', chapter: 3 },
+            { id: 304, latin: 'sōlum Adv.', german: 'nur', chapter: 3 },
+            { id: 305, latin: 'negāre, o, āvī, ātum', german: 'verleugnen, verneinen', chapter: 3 },
+            { id: 306, latin: 'voluntās, ātis f.', german: 'Wille, Absicht, Zustimmung', chapter: 3 },
+            { id: 307, latin: 'tōtus, a, um', german: 'ganz', chapter: 3 },
+            { id: 308, latin: 'vīs, Akk. vim, Abl. vī; Pl. virēs, ium f.', german: 'Kraft, Stärke, Gewalt', chapter: 3 },
+            { id: 309, latin: 'nec / neque', german: 'und nicht, auch nicht', chapter: 3 },
+            { id: 310, latin: 'annus, ī m.', german: 'Jahr', chapter: 3 },
+            { id: 311, latin: 'mortālis, is, e', german: 'sterblich, Subst. der sterbliche Mensch', chapter: 3 },
+            { id: 312, latin: 'quī, quae, quod', german: 'welche, welcher, welches, der, die, das', chapter: 3 },
+            { id: 313, latin: 'optāre, o, āvī, ātum', german: 'wünschen', chapter: 3 },
+            { id: 314, latin: 'dum', german: 'während, solange, bis', chapter: 3 },
+            { id: 315, latin: 'sinere, o, sīvī, situm', german: 'lassen, zulassen, erlauben', chapter: 3 },
+            { id: 316, latin: 'parcere, o, peperci, parsum', german: 'schonen, verschonen', chapter: 3 },
+            { id: 317, latin: 'puer, erī m.', german: 'Junge', chapter: 3 },
+            { id: 318, latin: 'ūtī, or, ūsus sum', german: 'benutzen, gebrauchen', chapter: 3 },
+            { id: 319, latin: 'equus, ī m.', german: 'Pferd', chapter: 3 },
+            { id: 320, latin: 'sponte suā', german: 'freiwillig, von selbst', chapter: 3 },
+            { id: 321, latin: 'properāre, o, āvī, ātum', german: 'eilen, sich beeilen', chapter: 3 },
+            { id: 322, latin: 'immō Adv.', german: 'im Gegenteil, ja sogar', chapter: 3 },
+            { id: 323, latin: 'caelum, ī n.', german: 'Himmel', chapter: 3 },
+            { id: 324, latin: 'aequus, a, um', german: 'eben, gerecht, gleich', chapter: 3 },
+            { id: 325, latin: 'premere, o, pressī, pressum', german: 'drücken, unterdrücken', chapter: 3 },
+            { id: 326, latin: 'altus, a, um', german: 'hoch, tief', chapter: 3 },
+            { id: 327, latin: 'īre, eō, iī, itum', german: 'gehen', chapter: 3 },
+
+            // --- Kapitel 4 (29 Vokabeln) ---
+            { id: 401, latin: 'timēre, eo, uī', german: 'sich fürchten, Angst haben (vor)', chapter: 4 },
+            { id: 402, latin: 'nescīre, io, īvī, ītum', german: 'nicht wissen, nicht kennen, nicht verstehen', chapter: 4 },
+            { id: 403, latin: 'quā Adv.', german: 'wohin', chapter: 4 },
+            { id: 404, latin: 'flectere, o, flexī, flexum', german: 'biegen, beugen, lenken', chapter: 4 },
+            { id: 405, latin: 'ubī Adv.', german: 'wo', chapter: 4 },
+            { id: 406, latin: 'iter, itineris n.', german: 'der Weg', chapter: 4 },
+            { id: 407, latin: 'etsī Konj.', german: 'wenn, auch/auch wenn', chapter: 4 },
+            { id: 408, latin: 'imperāre, o, āvī, ātum', german: 'befehlen', chapter: 4 },
+            { id: 409, latin: 'iacēre, eo, cuī', german: 'liegen', chapter: 4 },
+            { id: 410, latin: 'timor, ōris m.', german: 'die Angst', chapter: 4 },
+            { id: 411, latin: 'clāmāre, o, āvī, ātum', german: 'schreien, laut reden', chapter: 4 },
+            { id: 412, latin: 'numquam Adv.', german: 'niemals', chapter: 4 },
+            { id: 413, latin: 'tangere, o, tetigī, tāctum', german: 'berühren', chapter: 4 },
+            { id: 414, latin: 'nōn iam Adv.', german: 'nicht mehr', chapter: 4 },
+            { id: 415, latin: 'ignis, is m.', german: 'das Feuer', chapter: 4 },
+            { id: 416, latin: 'arbor, oris f.', german: 'der Baum', chapter: 4 },
+            { id: 417, latin: 'cum Präp. m. Abl.', german: 'mit', chapter: 4 },
+            { id: 418, latin: 'flamma, ae f.', german: 'die Flamme, das Feuer', chapter: 4 },
+            { id: 419, latin: 'urbs, urbis f.', german: 'die Stadt', chapter: 4 },
+            { id: 420, latin: 'perīre, eo, iī', german: 'umkommen', chapter: 4 },
+            { id: 421, latin: 'moenia, ium Pl. n.', german: 'die Mauer, die Stadtmauer', chapter: 4 },
+            { id: 422, latin: 'incendium, iī n.', german: 'der Brand, das Feuer', chapter: 4 },
+            { id: 423, latin: 'tōtus, a, um', german: 'ganz', chapter: 4 },
+            { id: 424, latin: 'populus, ī m.', german: 'das Volke', chapter: 4 },
+            { id: 425, latin: 'cinis, cineris m.', german: 'die Asche', chapter: 4 },
+            { id: 426, latin: 'vertere, o, vertī, versum', german: 'wenden, drehen', chapter: 4 },
+            { id: 427, latin: 'silva, ae f.', german: 'der Wald', chapter: 4 },
+            { id: 428, latin: 'mōns, montis m.', german: 'der Berg', chapter: 4 },
+            { id: 429, latin: 'ārdēre, eo, ārsī', german: 'brennen, verbrennen', chapter: 4 },
+            
+            // --- Kapitel 5 (31 Vokabeln) ---
+            { id: 501, latin: 'nōnne Fragepartikel', german: '(etwa) nicht?', chapter: 5 },
+            { id: 502, latin: 'sī Konj.', german: 'wenn, falls', chapter: 5 },
+            { id: 503, latin: 'ēdere, o, didī, ditum', german: 'herausgeben, bekanntmachen', chapter: 5 },
+            { id: 504, latin: 'iūrāre, o, āvī, ātum', german: 'schwören', chapter: 5 },
+            { id: 505, latin: 'fīlius, iī m.', german: 'der Sohn', chapter: 5 },
+            { id: 506, latin: 'spectāre, o, āvī, ātum', german: 'betrachten, anschauen, zuschauen', chapter: 5 },
+            { id: 507, latin: 'orbis, is m.', german: 'der Kreis (lauf), der Erdkreis, die Welt', chapter: 5 },
+            { id: 508, latin: 'terra, ae f.', german: 'die Erde, das Land', chapter: 5 },
+            { id: 509, latin: 'noster, nostra, nostrum', german: 'unser', chapter: 5 },
+            { id: 510, latin: 'ā / ab Präp. m. Abl.', german: 'von, von ... her', chapter: 5 },
+            { id: 511, latin: 'ipse, ipsa, ipsum', german: '(er, sie, es) selbst, persönlich, gerade, sogar', chapter: 5 },
+            { id: 512, latin: 'dēfendere, o, dī, fēnsum', german: 'verteidigen, schützen', chapter: 5 },
+            { id: 513, latin: 'sīve ... sīve Konj.', german: 'sei es, dass ... oder (ob)', chapter: 5 },
+            { id: 514, latin: 'sīcutī Adv./Konj.', german: 'so wie, wie', chapter: 5 },
+            { id: 515, latin: 'tam Adv.', german: 'so (sehr)', chapter: 5 },
+            { id: 516, latin: 'cōnfiterī, eor, cōnfessus sum', german: 'bekennen, gestehen', chapter: 5 },
+            { id: 517, latin: 'vīvere, o, vīxī, vīctum', german: 'leben', chapter: 5 },
+            { id: 518, latin: 'ad Präp. m. Akk.', german: 'zu, an, bei, nach', chapter: 5 },
+            { id: 519, latin: 'nēmō (Dat. nēminī, Akk. nēminem)', german: 'niemand', chapter: 5 },
+            { id: 520, latin: 'cōgitāre, o, āvī, ātum', german: 'denken, nachdenken', chapter: 5 },
+            { id: 521, latin: 'cōnsilium, iī n.', german: 'Plan, Beschluss, Rat', chapter: 5 },
+            { id: 522, latin: 'in Präp. m. Abl.', german: 'in, an, auf, bei', chapter: 5 },
+            { id: 523, latin: 'vīta, ae f.', german: 'das Leben', chapter: 5 },
+            { id: 524, latin: 'prīvātus, a, um', german: 'persönlich, privat, der einzelne', chapter: 5 },
+            { id: 525, latin: 'iūdex, icis m.', german: 'der Richter', chapter: 5 },
+            { id: 526, latin: 'multus, a, um', german: 'viel', chapter: 5 },
+            { id: 527, latin: 'iūdicāre, o, āvī, ātum', german: 'urteilen, richten, beurteilen', chapter: 5 },
+            { id: 528, latin: 'nūllus, a, um', german: 'kein', chapter: 5 },
+            { id: 529, latin: 'licet Konj.', german: 'es ist erlaubt, es ist möglich', chapter: 5 },
+            { id: 530, latin: 'cēterum Adv.', german: 'übrigens, im Übrigen', chapter: 5 },
+            { id: 531, latin: 'dēbēre, eo, uī, itum', german: 'schulden, müssen', chapter: 5 },
+        ];
+
+        let currentTab = 'Lernen';
+        let currentChapter = 1;
+
+        // --- Global State for Learn Mode ---
+        let filteredVocabulary = [];
+        let currentCardIndex = 0;
+
+        // --- Global State for Quiz Mode ---
+        let quizState = {
+            questions: [],
+            currentQuestionIndex: 0,
+            score: 0,
+            isFinished: false,
+        };
+
+        const contentContainer = document.getElementById('content-container');
+
+        // --- Helper: Lucide Icons as SVG ---
+        const icons = {
+            GraduationCap: `<svg xmlns="http://www.w3.org/2000/svg" class="icon mr-1 sm:mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M12 21v-6"/><path d="M2 14v6M22 14v6"/></svg>`,
+            Award: `<svg xmlns="http://www.w3.org/2000/svg" class="icon mr-1 sm:mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="12 15 12 21"/><path d="M17 18H7"/><line x1="12" x2="12" y1="21" y2="15"/></svg>`,
+            Check: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="inline-block"><path d="M20 6 9 17l-5-5"/></svg>`,
+            X: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="inline-block"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
+            RotateCcw: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>`,
+            BookOpen: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block"><path d="M2 20h20"/><path d="M6 18.33V7a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v11.33"/><path d="M14 18.33h6a2 2 0 0 0 2-2V7a4 4 0 0 0-4-4h-4"/><path d="M10 18.33H2a2 2 0 0 1-2-2V7a4 4 0 0 1 4-4h4"/></svg>`,
+        };
+
+        // --- Chapter Selector Component ---
+        function renderChapterSelector(currentMode) {
+            return `
+                <div class="mb-8 p-3 bg-gray-800 rounded-xl shadow-inner flex flex-col sm:flex-row items-center">
+                    <label for="chapter-select" class="text-sm font-semibold text-gray-400 mr-4 mb-2 sm:mb-0">${currentMode}-Kapitel wählen:</label>
+                    <select id="chapter-select" onchange="handleChapterChange(this.value)"
+                        class="w-full sm:w-auto p-2 bg-gray-700 border border-gray-600 rounded-lg text-lg font-bold text-white transition-colors cursor-pointer"
+                        style="--tw-ring-color: var(--accent-color);">
+                        ${[1, 2, 3, 4, 5].map(c => `
+                            <option value="${c}" ${c === currentChapter ? 'selected' : ''}>
+                                Kapitel ${c} (${initialVocabulary.filter(v => v.chapter === c).length} Vokabeln)
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+            `;
+        }
+        
+        // --- Tab Management ---
+        function changeTab(tabName) {
+            currentTab = tabName;
+            document.querySelectorAll('nav button').forEach(btn => {
+                if (btn.id === `tab-${tabName}`) {
+                    btn.className = `flex-1 p-2 sm:px-4 sm:py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform-gpu flex items-center justify-center bg-[#489c49] text-white shadow-lg scale-[1.03]`;
+                } else {
+                    btn.className = `flex-1 p-2 sm:px-4 sm:py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform-gpu flex items-center justify-center text-[#489c49] bg-gray-800 hover:bg-gray-700`;
+                }
+            });
+            renderContent();
+        }
+
+        function handleChapterChange(chapter) {
+            currentChapter = parseInt(chapter);
+            filteredVocabulary = initialVocabulary.filter(v => v.chapter === currentChapter);
+            document.getElementById('chapter-display').textContent = `Aktuelles Kapitel: ${currentChapter}`;
+            if (currentTab === 'Lernen') {
+                resetLearnMode();
+            } else if (currentTab === 'Quiz') {
+                generateQuiz(filteredVocabulary);
+            }
+            renderContent();
+        }
+
+        // --- Learn Mode ---
+        function renderLearnMode() {
+            filteredVocabulary = initialVocabulary.filter(v => v.chapter === currentChapter);
+            currentCardIndex = 0;
+
+            if (filteredVocabulary.length === 0) {
+                return renderChapterSelector('Lernen') + `<div class="text-center p-8 text-gray-400">Keine Vokabeln in diesem Kapitel gefunden.</div>`;
+            }
+
+            return `
+                ${renderChapterSelector('Lernen')}
+                <div class="relative flex flex-col items-center">
+                    <div id="card-status" class="text-sm font-medium text-gray-400 mb-6">
+                        Karte 1 von ${filteredVocabulary.length}
+                    </div>
+
+                    <!-- NEUE STRUKTUR: Wrapper mit fester Max-Breite und Overflow Hidden -->
+                    <div class="relative w-full max-w-sm sm:max-w-md mx-auto h-[300px] overflow-hidden rounded-2xl">
+                        <div id="card-carousel" class="h-full w-full relative">
+                            ${filteredVocabulary.map((vocab, index) => `
+                                <div id="card-slide-${index}" class="flex-shrink-0 flex items-center justify-center h-full w-full absolute transition-all duration-500 ease-in-out p-4" 
+                                    style="transform: translateX(${(index - currentCardIndex) * 100}%); left: 0; top: 0;">
+                                    
+                                    <!-- Die Karte füllt jetzt den gesamten Slide-Bereich aus -->
+                                    <div class="card-container">
+                                        <div id="card-inner-${index}" class="card-inner" onclick="flipCard(${index})">
+                                            <!-- Front (Latin) -->
+                                            <div class="card-face card-front">
+                                                <div class="text-center">
+                                                    <p class="text-sm font-light opacity-80 mb-2">Lateinisch</p>
+                                                    <h2 class="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight">${vocab.latin}</h2>
+                                                </div>
+                                            </div>
+                                            <!-- Back (German) -->
+                                            <div class="card-face card-back">
+                                                <div class="text-center">
+                                                    <p class="text-sm font-light opacity-80 mb-2 text-gray-400">Übersetzung</p>
+                                                    <h2 class="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight">${vocab.german}</h2>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <!-- ENDE NEUE STRUKTUR -->
+
+                    <!-- Navigation Buttons -->
+                    <div class="mt-8 flex space-x-4 z-10">
+                        <button onclick="navigateCard(-1)" class="p-3 bg-gray-800 text-gray-100 rounded-full shadow-lg border border-gray-700 hover:bg-gray-700 transition-colors duration-200" aria-label="Vorherige Karte">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <button onclick="navigateCard(1)" class="p-3 bg-gray-800 text-gray-100 rounded-full shadow-lg border border-gray-700 hover:bg-gray-700 transition-colors duration-200" aria-label="Nächste Karte">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="mt-4 text-xs text-gray-400">
+                        Klicke/Tippe auf die Karte zum Umdrehen. Benutze die Pfeiltasten (links/rechts) zur Navigation.
+                    </div>
+                </div>
+            `;
+        }
+
+        function resetLearnMode() {
+            currentCardIndex = 0;
+        }
+
+        function flipCard(index) {
+            const cardInner = document.getElementById(`card-inner-${index}`);
+            if (cardInner) {
+                cardInner.classList.toggle('is-flipped');
+            }
+        }
+
+        function navigateCard(direction) {
+            const total = filteredVocabulary.length;
+            
+            // Unflip current card before moving
+            const currentCardInner = document.getElementById(`card-inner-${currentCardIndex}`);
+            if (currentCardInner) {
+                currentCardInner.classList.remove('is-flipped');
+            }
+
+            currentCardIndex = (currentCardIndex + direction + total) % total;
+            
+            // Update UI
+            const status = document.getElementById('card-status');
+            if (status) {
+                status.textContent = `Karte ${currentCardIndex + 1} von ${total}`;
+            }
+
+            // Move the carousel
+            const slides = document.querySelectorAll('[id^="card-slide-"]');
+            slides.forEach((slide, index) => {
+                slide.style.transform = `translateX(${(index - currentCardIndex) * 100}%)`;
+            });
+        }
+
+        function setupKeyboardNavigation() {
+            document.removeEventListener('keydown', handleKeyDown);
+            document.addEventListener('keydown', handleKeyDown);
+        }
+
+        function handleKeyDown(e) {
+            if (currentTab === 'Lernen') {
+                if (e.key === 'ArrowLeft') navigateCard(-1);
+                if (e.key === 'ArrowRight') navigateCard(1);
+                if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    flipCard(currentCardIndex);
+                }
+            }
+        }
+
+        // --- Quiz Mode ---
+        function generateQuiz(vocab) {
+            if (vocab.length < 4) {
+                quizState.questions = [];
+                quizState.isFinished = true; // Use finished state to show error message
+                return;
+            }
+
+            const shuffledVocab = [...vocab].sort(() => 0.5 - Math.random());
+            const quizVocab = shuffledVocab.slice(0, Math.min(10, vocab.length));
+
+            const questions = quizVocab.map((item) => {
+                const correctText = item.german;
+                
+                let decoyOptions = initialVocabulary
+                    .filter(v => v.german !== correctText)
+                    .sort(() => 0.5 - Math.random())
+                    .slice(0, 3)
+                    .map((v, idx) => ({ id: idx, text: v.german }));
+
+                const correctAnswer = { id: 99, text: correctText };
+                
+                const allOptions = [...decoyOptions, correctAnswer]
+                    .sort(() => 0.5 - Math.random());
+
+                return {
+                    prompt: item.latin,
+                    correctAnswer: correctAnswer,
+                    options: allOptions,
+                    answered: false,
+                    correctlyAnswered: false,
+                };
+            });
+
+            quizState = {
+                score: 0,
+                currentQuestionIndex: 0,
+                questions,
+                isFinished: false,
+            };
+        }
+
+        function renderQuizMode() {
+            filteredVocabulary = initialVocabulary.filter(v => v.chapter === currentChapter);
+            
+            if (filteredVocabulary.length < 4 && !quizState.isFinished) {
+                generateQuiz(filteredVocabulary);
+            }
+
+            if (filteredVocabulary.length < 4) {
+                 return renderChapterSelector('Quiz') + `
+                    <div class="text-center p-8 text-gray-400">
+                        ${icons.Award}
+                        <p class="mt-4">Wähle ein Kapitel mit mindestens 4 Vokabeln, um ein Quiz zu starten.</p>
+                    </div>`;
+            }
+
+            if (quizState.isFinished) {
+                return renderQuizResult();
+            }
+
+            if (quizState.questions.length === 0) {
+                // Initial generation if needed
+                generateQuiz(filteredVocabulary);
+                if (quizState.questions.length === 0) {
+                    // Fallback after attempting generation
+                    return renderChapterSelector('Quiz') + `<div class="text-center p-8 text-gray-400">Quiz konnte nicht gestartet werden.</div>`;
+                }
+            }
+
+            const question = quizState.questions[quizState.currentQuestionIndex];
+            const totalQuestions = quizState.questions.length;
+            
+            return `
+                ${renderChapterSelector('Quiz')}
+                <div class="w-full max-w-lg mx-auto flex flex-col h-full relative">
+                    <!-- Score and Question Header -->
+                    <div class="flex justify-between items-center mb-6 p-4 bg-gray-800 rounded-xl shadow-xl border-b-4 border-solid" style="border-color: var(--accent-color);">
+                        <p class="text-lg font-semibold text-gray-400">Frage ${quizState.currentQuestionIndex + 1} von ${totalQuestions}</p>
+                        <div class="text-xl font-bold text-gray-50">Score: <span id="quiz-score">${quizState.score}</span></div>
+                    </div>
+
+                    <!-- Question Prompt -->
+                    <div class="mb-8 p-4 bg-gray-700 rounded-xl shadow-md">
+                        <h3 class="text-3xl sm:text-4xl font-extrabold text-gray-50 text-center">${question.prompt}</h3>
+                    </div>
+
+                    <!-- Answer Grid -->
+                    <div id="quiz-options" class="grid grid-cols-2 gap-4 flex-grow">
+                        ${question.options.map((answer, index) => `
+                            <button id="option-${index}"
+                                onclick="handleAnswer('${answer.text}', ${answer.text === question.correctAnswer.text})"
+                                class="quiz-option-${(index % 4) + 1} relative p-4 sm:p-6 rounded-xl text-white font-extrabold text-lg sm:text-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg whitespace-normal text-left">
+                                <span class="block">${answer.text}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+
+                    <!-- Feedback/Next Button Container -->
+                    <div id="quiz-feedback" class="mt-6 text-center hidden">
+                        <p id="feedback-text" class="text-xl font-bold mb-4"></p>
+                        <button id="next-question-btn" onclick="nextQuestion()"
+                            class="w-full p-3 text-white rounded-xl font-bold text-lg shadow-md hover:brightness-110 transition-colors"
+                            style="background-color: var(--accent-color);">
+                            Weiter
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleAnswer(selectedText, isCorrect) {
+            if (quizState.questions[quizState.currentQuestionIndex].answered) return;
+
+            const question = quizState.questions[quizState.currentQuestionIndex];
+            question.answered = true;
+            question.correctlyAnswered = isCorrect;
+
+            if (isCorrect) {
+                quizState.score++;
+                document.getElementById('quiz-score').textContent = quizState.score;
+            }
+
+            // Update button styles and display feedback
+            const optionsContainer = document.getElementById('quiz-options');
+            if (optionsContainer) {
+                Array.from(optionsContainer.children).forEach(button => {
+                    const buttonText = button.querySelector('span').textContent;
+                    const isCorrectOption = buttonText === question.correctAnswer.text;
+                    const isSelectedOption = buttonText === selectedText;
+
+                    button.disabled = true;
+                    button.classList.remove('quiz-option-1', 'quiz-option-2', 'quiz-option-3', 'quiz-option-4', 'hover:scale-[1.02]');
+                    button.classList.add('quiz-option-disabled', 'opacity-50');
+                    button.style.transform = ''; // Reset hover transform
+
+                    if (isCorrectOption) {
+                        button.classList.remove('opacity-50', 'quiz-option-disabled');
+                        button.classList.add('quiz-option-correct', 'scale-[1.05]', 'ring-4', 'ring-emerald-300');
+                        button.innerHTML = `<span class="block">${buttonText}</span><span class="absolute top-2 right-2">${icons.Check}</span>`;
+                    } else if (isSelectedOption && !isCorrect) {
+                        button.classList.remove('opacity-50', 'quiz-option-disabled');
+                        button.classList.add('quiz-option-incorrect', 'scale-[1.05]', 'ring-4', 'ring-red-300');
+                        button.innerHTML = `<span class="block">${buttonText}</span><span class="absolute top-2 right-2">${icons.X}</span>`;
+                    }
+                });
+            }
+
+            // Display feedback block
+            const feedbackText = document.getElementById('feedback-text');
+            const feedbackContainer = document.getElementById('quiz-feedback');
+            const nextButton = document.getElementById('next-question-btn');
+
+            if (feedbackText && feedbackContainer && nextButton) {
+                feedbackText.textContent = isCorrect ? 'Korrekt!' : 'Falsch!';
+                feedbackText.className = `text-xl font-bold mb-4 ${isCorrect ? 'text-emerald-400' : 'text-red-400'}`;
+                feedbackContainer.classList.remove('hidden');
+                
+                if (quizState.currentQuestionIndex < quizState.questions.length - 1) {
+                    nextButton.textContent = 'Nächste Frage';
+                } else {
+                    nextButton.textContent = 'Quiz beenden';
+                }
+            }
+        }
+
+        function nextQuestion() {
+            if (quizState.currentQuestionIndex < quizState.questions.length - 1) {
+                quizState.currentQuestionIndex++;
+                renderContent(); // Re-render to show next question
+            } else {
+                quizState.isFinished = true;
+                renderContent(); // Re-render to show result
+            }
+        }
+
+        function renderQuizResult() {
+            const totalQuestions = quizState.questions.length;
+            const score = quizState.score;
+            const percentage = (score / totalQuestions) * 100;
+
+            return `
+                ${renderChapterSelector('Quiz')}
+                <div class="text-center p-8 bg-gray-800 rounded-xl shadow-2xl max-w-md mx-auto mt-12 text-gray-50">
+                    <h2 class="text-4xl font-extrabold text-[#489c49] mb-4">Quiz beendet!</h2>
+                    <p class="text-xl mb-6">
+                        Dein Ergebnis: <span class="text-emerald-400 font-black">${score}</span> von ${totalQuestions}
+                    </p>
+                    <div class="w-full bg-gray-700 rounded-full h-4 mb-6 overflow-hidden">
+                        <div
+                            class="bg-emerald-500 h-4 rounded-full transition-all duration-700"
+                            style="width: ${percentage}%;"
+                        ></div>
+                    </div>
+                    <button onclick="restartQuiz()"
+                        class="w-full flex items-center justify-center p-3 text-white rounded-xl font-bold text-lg shadow-md hover:brightness-110 transition-colors"
+                        style="background-color: var(--accent-color);">
+                        ${icons.RotateCcw} Neues Quiz starten
+                    </button>
+                </div>
+            `;
+        }
+
+        function restartQuiz() {
+            generateQuiz(filteredVocabulary);
+            renderContent();
+        }
+
+
+        // --- Main Render Function ---
+        function renderContent() {
+            if (currentTab === 'Lernen') {
+                contentContainer.innerHTML = renderLearnMode();
+                setupKeyboardNavigation();
+            } else if (currentTab === 'Quiz') {
+                contentContainer.innerHTML = renderQuizMode();
+                document.removeEventListener('keydown', handleKeyDown); // Disable keys for quiz
+            }
+            // Ensure the chapter display is updated globally
+            document.getElementById('chapter-display').textContent = `Aktuelles Kapitel: ${currentChapter}`;
+        }
+
+        // --- Initialization ---
+        window.onload = () => {
+            // Set initial vocabulary and start on 'Lernen' tab
+            handleChapterChange(currentChapter); 
+            changeTab('Lernen');
+        };
+    </script>
+</body>
+</html>
+
